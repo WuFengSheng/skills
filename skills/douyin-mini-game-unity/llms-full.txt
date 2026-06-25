@@ -1,0 +1,750 @@
+# 抖音小游戏 Unity C# API 全量参考 (llms-full)
+
+> 基于官方文档 https://developer.open-douyin.com/docs/resource/zh-CN/mini-game/develop/api/c-api/api-overview
+> 生成时间: 2026-06-24
+> 涵盖: Unity C# API 全量参考（初始化、账号、支付、广告、设备、网络、文件、UI、渲染、开放能力）
+
+---
+
+# 一、API 概览与初始化
+
+## 1.1 初始化与环境判断
+
+### TT.InitSDK
+初始化抖音小游戏 SDK，必须优先于其他 API 调用。回调返回容器环境信息。
+```csharp
+public static int InitSDK(OnTTContainerInitCallback callback = null)
+// 委托: public delegate void OnTTContainerInitCallback(int code, ContainerEnv env);
+```
+示例:
+```csharp
+TT.InitSDK((code, env) => {
+    if (code == 0) Debug.Log($"Init OK, AppId={env.GameAppId}, Host={env.m_HostEnum}");
+});
+```
+
+### TT.InContainerEnv
+只读属性，判断是否在抖音小游戏容器（真机）中运行。
+```csharp
+public static bool InContainerEnv { get; }
+```
+
+### ContainerEnv
+InitSDK 回调返回的宿主环境信息对象。
+
+| 属性 | 类型 | 说明 |
+|------|------|------|
+| GameAppId | string | 小游戏 AppId |
+| m_HostEnum | HostEnum | 宿主 App 枚举 |
+| m_LaunchFromEnum | LaunchFromEnum | 启动来源枚举 |
+
+| 方法 | 返回类型 | 说明 |
+|------|------|------|
+| GetContainerRuntime() | ContainerRuntime | 运行时类型: Unity(0)/Launcher(1)/Standard(2) |
+| GetVersionType() | VersionType | 版本类型: None(0)/Perview(1)/Test(2)/Release(3) |
+| GetLaunchFromStr() | string | 启动来源字符串描述 |
+| GetQueryFromScheme() | Dictionary\<string,string\> | scheme 启动 query 参数 |
+| GetLocation() | string | 宿主位置信息 |
+| GetLaunchFrom() | LaunchFromEnum | 启动来源枚举 |
+| GetLaunchOptionsSync() | LaunchOption | 同步获取启动参数 |
+
+### HostEnum
+| 值 | 名称 | 值 | 名称 |
+|------|------|------|------|
+| 0 | None(未知) | 7 | XiGua(西瓜视频) |
+| 1 | Toutiao(今日头条) | 8 | Helo |
+| 2 | Douyin(抖音) | 9 | Tiktok(海外) |
+| 3 | ToutiaoLite(头条极速) | 10 | PiPiXia(皮皮虾) |
+| 4 | DouyinLite(抖音极速) | 11 | MoMoYu(摸摸鱼) |
+| 5 | HuoShan(火山) | 12 | DongCheDi(懂车帝) |
+| 6 | HuoShanLite(火山极速) | 13 | Fanqie(番茄小说) |
+
+### LaunchFromEnum
+| 值 | 名称 | 值 | 名称 |
+|------|------|------|------|
+| 0 | UnKnown | 5 | Share(分享) |
+| 1 | Search(搜索) | 6 | Video_Archor(视频锚点) |
+| 2 | DeskTop(桌面) | 7 | Feed(信息流) |
+| 3 | MP_List(列表) | 8 | MiniApk |
+| 4 | Scan(扫码) |
+
+### LaunchOption
+通过 GetLaunchOptionsSync() 获取的启动参数对象。
+| 属性 | 类型 | 属性 | 类型 |
+|------|------|------|------|
+| Path | string | SubScene | int |
+| Query | Dictionary\<string,string\> | IsSticky | bool |
+| Scene | int | ShareTicket | string |
+| GroupId | string | Extra | Dictionary\<string,object\> |
+| RefererInfo | Dictionary\<string,object\> |
+
+## 1.2 工具方法
+
+### TT.CanIUse
+判断 API 在当前宿主版本是否可用。
+```csharp
+public static bool CanIUse(string apiName)
+```
+
+### TT.EnableTTSDKDebugToast / TT.RegisterCommandEvent
+```csharp
+public static void EnableTTSDKDebugToast(bool enable)
+public static void RegisterCommandEvent(Action<string> callback)
+```
+
+---
+
+# 二、账号与开放能力核心
+
+## 2.1 登录与会话
+
+### TT.Login
+调用登录面板获取用户授权，返回临时 code/匿名 code/是否已登录。
+```csharp
+public static void Login(Action<string, string, bool> success, Action<string> fail, bool forceLogin = false)
+```
+示例:
+```csharp
+TT.Login(
+    (code, anonymousCode, isLogin) => { /* code 发给服务端换 session */ },
+    (errMsg) => Debug.LogError($"登录失败: {errMsg}"),
+    forceLogin: true
+);
+```
+
+### TT.CheckSession
+检查 session 有效性，过期需重新登录。
+```csharp
+public static void CheckSession(Action success, Action<string> fail)
+```
+
+### TT.GetUserInfo
+获取用户信息（昵称/头像/性别等），需 ref 参数。
+```csharp
+public static void GetUserInfo(Action success, Action<string> fail, ref TTUserInfo userInfo)
+```
+TTUserInfo 属性: NickName(string), AvatarUrl(string), Gender(int: 0未知/1男/2女), Country, Province, City, Language
+
+示例:
+```csharp
+var userInfo = new TTUserInfo();
+TT.GetUserInfo(() => Debug.Log(userInfo.NickName), (err) => Debug.LogError(err), ref userInfo);
+```
+
+## 2.2 权限管理
+
+### TT.GetSetting / TT.OpenSetting
+```csharp
+public static void GetSetting(Action<AuthSetting> callback) // 获取授权状态
+public static void OpenSetting(Action<AuthSetting> callback = null) // 打开设置面板
+```
+AuthSetting 属性 (全部 bool): UserInfo, UserLocation, Record, Album, Camera, ScreenRecord, Calendar
+
+### TT.GetUserInfoAuth / TT.OpenSettingsPanel
+```csharp
+public static void GetUserInfoAuth(Action<bool> callback)
+public static void OpenSettingsPanel(Action<bool> callback = null)
+```
+
+## 2.3 实名认证与抖音授权
+
+### TT.SetRealNameAuthenticationCallback / TT.AuthenticateRealName
+```csharp
+public static void SetRealNameAuthenticationCallback(Action<bool> callback)
+public static void AuthenticateRealName(Action<bool> callback)
+```
+
+### TT.ShowDouyinOpenAuth
+展示抖音开放平台授权面板，scopes 为 Dictionary\<string, DouyinPermissionScopeStatus\>。
+DouyinPermissionScopeStatus: Required(0), OptionalSelected(1), OptionalUnselected(2)
+```csharp
+public static void ShowDouyinOpenAuth(Dictionary<string, DouyinPermissionScopeStatus> scopes, Action<Dictionary<string, bool>> callback)
+```
+示例:
+```csharp
+var scopes = new Dictionary<string, DouyinPermissionScopeStatus> {
+    {"user_info", DouyinPermissionScopeStatus.Required},
+    {"video.list", DouyinPermissionScopeStatus.OptionalSelected}
+};
+TT.ShowDouyinOpenAuth(scopes, (results) => { /* 处理授权结果 */ });
+```
+
+---
+
+# 三、开放能力-扩展
+
+## 3.1 侧边栏
+```csharp
+TT.CheckScene(string scene, Action<bool>)              // 检查场景是否支持侧边栏
+TT.NavigateToScene(string scene, Action<bool>)         // 跳转场景
+TT.RequestPromotionActivity(string id, Action<bool>)   // 参与推广活动
+TT.ReceiveCoupon(string couponId, Action<bool>)         // 领取优惠券
+```
+
+## 3.2 收藏与群聊
+```csharp
+TT.ShowFavoriteGuide(Action<bool> = null)                      // 收藏引导
+TT.JoinGroup(string groupId, Action<bool>)                      // 加入群聊
+TT.CheckGroupInfo(string groupId, Action<Dictionary<string,object>>)
+```
+
+## 3.3 关注抖音号
+```csharp
+TT.CheckFollowAwemeState(Action<bool>)    // 是否已关注
+TT.OpenAwemeUserProfile(string = "")      // 打开主页
+TT.CheckBoundAweme(Action<bool>)          // 是否绑定抖音号
+```
+
+## 3.4 直玩
+```csharp
+TT.RequestFeedSubscribe(Action<bool>)          // 请求信息流订阅
+TT.CheckFeedSubscribeStatus(Action<bool>)      // 检查订阅状态
+TT.OnFeedStatusChange(Action<bool>)            // 监听状态变化
+TT.OffFeedStatusChange(Action<bool>)           // 取消监听
+```
+
+## 3.5 互推与排行榜
+```csharp
+TT.CreateGridGamePanel(GridGamePanelParam) → GridGamePanel   // 互推面板(Show/Hide/Destroy)
+TT.SetImRankData(int score, Action<bool> = null)              // 设置排行数据
+TT.GetImRankList(Action<string>)                              // 获取排行列表
+TT.GetImRankData(Action<string>)                              // 获取自身排行
+```
+
+## 3.6 直播
+```csharp
+TTLiveManager live = TT.GetLiveManager();
+live.CheckRoomIsValid(Action<bool>); live.GetLiveStatus(Action<string>); live.NavigateToLive();
+live.OnXScreenSizeChange(Action<int,int>); live.OffXScreenSizeChange();
+```
+
+## 3.7 公会群
+```csharp
+TT.GetUnionGroupInfo(Action<string>)
+TT.BindUnionGroup(string groupId, Action<bool>)
+TT.UnbindUnionGroup(Action<bool>)
+TT.JoinUnionGroup(string groupId, Action<bool>)
+```
+
+## 3.8 数据分析、客服、订阅、快捷方式、邀请
+```csharp
+TT.ReportAnalytics(string eventName, Dictionary<string,object>)  // 自定义上报
+TT.ReportScene(string sceneId, int costTime = 0)                // 场景上报
+TT.OpenCustomerServiceConversation(Dictionary<string,object>=null) // 客服
+TT.RequestSubscribeMessage(List<string> tmplIds, Action<Dictionary<string,string>>)
+TT.AddShortcut(Action<bool>); TT.CheckShortcut(Action<bool>)     // 快捷方式
+TT.CreateInvitePanel(Action<bool>)
+TT.OnInviteStateChanged(Action<string,object>)                   // 邀请
+```
+
+---
+
+# 四、支付
+
+## 4.1 钻石支付
+
+### TT.OpenAwemeCustomerService
+通过客服页面完成钻石/道具支付。
+```csharp
+public static void OpenAwemeCustomerService(OpenAwemeCustomerServiceParam param)
+```
+
+| 属性 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| BuyQuantity | int | 是 | 购买数量 |
+| CustomId | string | 是 | 唯一订单号(建议 UUID+时间戳) |
+| CurrencyType | string | 是 | "DIAMOND" |
+| ZoneId | string | 否 | 分区 ID |
+| ExtraInfo | string | 否 | 额外信息 |
+| GoodType | int | 否 | 商品类型 |
+| OrderAmount | int | 否 | 订单金额(分) |
+| GoodName | string | 否 | 商品名称 |
+| GoodsId | string | 否 | 商品 ID |
+| Success | Action\<PayResult\> | 否 | 支付成功回调 |
+| Fail | Action\<PayError\> | 否 | 支付失败回调 |
+| Complete | Action | 否 | 完成回调 |
+
+示例:
+```csharp
+var param = new OpenAwemeCustomerServiceParam {
+    BuyQuantity = 10, CurrencyType = "DIAMOND",
+    CustomId = System.Guid.NewGuid().ToString(), ZoneId = "1",
+    Success = (r) => Debug.Log($"成功: {r.ErrMsg}"),
+    Fail = (e) => Debug.LogError($"失败: {e.ErrorCode} - {e.ErrMsg}")
+};
+TT.OpenAwemeCustomerService(param);
+```
+
+## 4.2 游戏币/道具直购
+
+### TT.RequestGamePayment
+发起直购支付，支持 "game"(游戏币) 和 "goods"(道具) 模式。
+```csharp
+public static void RequestGamePayment(RequestGamePaymentParam param)
+```
+
+| 属性 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| Mode | string | 是 | "game"/"goods" |
+| Env | int | 是 | 0(正式)/1(沙箱) |
+| CurrencyType | string | 是 | "CNY" |
+| Platform | string | 是 | "android"/"ios" |
+| BuyQuantity | int | 是 | 数量 |
+| CustomId | string | 是 | 唯一订单号 |
+| ZoneId | string | 否 | 分区 ID |
+| ExtraInfo | string | 否 | 额外信息 |
+| GoodType | int | 否 | 商品类型 |
+| OrderAmount | int | 否 | 金额(分) |
+| GoodName | string | 否 | 商品名 |
+| GoodsId | string | 否 | 商品 ID |
+| Success | Action\<PayResult\> | 否 | 成功回调 |
+| Fail | Action\<PayError\> | 否 | 失败回调 |
+| Complete | Action | 否 | 完成回调 |
+
+示例:
+```csharp
+var param = new RequestGamePaymentParam {
+    Mode = "game", Env = 0, CurrencyType = "CNY", Platform = "android",
+    BuyQuantity = 100, CustomId = System.Guid.NewGuid().ToString(),
+    Success = (r) => Debug.Log($"支付成功"),
+    Fail = (e) => Debug.LogError($"支付失败: code={e.ErrorCode}")
+};
+TT.RequestGamePayment(param);
+```
+
+## 4.3 支付错误码
+
+| 错误码 | 说明 | 错误码 | 说明 |
+|------|------|------|------|
+| -1 | 支付失败(通用) | -15098 | 未实名认证 |
+| -2 | 支付取消 | -15099 | 金额超限 |
+| -15001 | 缺少必要参数 | -15101 | customId 不唯一 |
+| -15002 | 参数不合法 | -16000 | 未登录 |
+| -15003 | App 不支持支付 | -20002 | 风控拦截 |
+| -15006 | 无支付权限 | 2 | 重复支付 |
+| -15009 | 内部错误 | 3 | 收银台失败 |
+| 4 | 网络异常 | 5 | iOS 不支持 |
+| 6 | 其他错误 | 21113 | 未成年人脸验证不通过 |
+
+## 4.4 限定价格等级 (元)
+1, 3, 6, 8, 12, 18, 25, 30, 40, 45, 50, 60, 68, 73, 78, 88, 98, 108, 118, 128, 148, 168, 188, 198, 328, 648, 998, 1288, 1998, 2998
+
+## 4.5 游戏金币 (Lite)
+```csharp
+TT.RequestGoldOrder(string customId, int amount, Action<bool> callback)
+```
+
+---
+
+# 五、广告
+
+## 5.1 Banner 广告
+
+### TT.CreateBannerAd
+创建 Banner 广告，常驻屏幕底部/顶部。方法: Show(), Hide(), Destroy(), OnResize(Action\<int,int\>)
+```csharp
+public static BannerAd CreateBannerAd(BannerAdParam param)
+```
+示例:
+```csharp
+var banner = TT.CreateBannerAd(new BannerAdParam { AdUnitId = "your_id" });
+banner.Show();
+```
+
+## 5.2 激励视频广告
+
+### TT.CreateRewardedVideoAd
+创建激励视频广告，支持普通模式和再得模式(Multiton)。
+```csharp
+public static TTRewardedVideoAd CreateRewardedVideoAd(CreateRewardedVideoAdParam param)
+```
+
+CreateRewardedVideoAdParam 属性:
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|------|------|
+| AdUnitId | string | - | 广告单元 ID |
+| Multiton | bool | false | 是否再得模式 |
+| MultitonRewardMsg | List\<string\> | null | 再得奖励文案列表 |
+| MultitonRewardTimes | int | 1 | 再得次数(1-4) |
+| ProgressTip | bool | true | 进度提示 |
+
+TTRewardedVideoAd: Load()/Show()/Destroy() + 事件 OnLoad(Action), OnError(AdErrorDelegate: int code, string msg), OnClose(RewardedAdClosedDelegate: bool isEnded, int count)
+
+示例-普通模式:
+```csharp
+var ad = TT.CreateRewardedVideoAd(new CreateRewardedVideoAdParam { AdUnitId = "id", Multiton = false });
+ad.OnLoad += () => Debug.Log("加载完成");
+ad.OnClose += (ended, count) => { if (ended) { /* 发奖 */ } ad.Load(); };
+ad.OnError += (code, msg) => Debug.LogError($"错误: {code}");
+ad.Load(); /* 合适时机 ad.Show(); */
+```
+
+示例-再得模式:
+```csharp
+var ad = TT.CreateRewardedVideoAd(new CreateRewardedVideoAdParam {
+    AdUnitId = "id", Multiton = true, MultitonRewardTimes = 3,
+    MultitonRewardMsg = new List<string> { "再看一次", "再看领双倍", "最后一次" }
+});
+```
+
+## 5.3 插屏广告
+```csharp
+public static InterstitialAd CreateInterstitialAd(InterstitialAdParam param)
+// 方法: Load()/Show()/Destroy(); 事件: OnLoad/OnError/OnClose，用法与激励视频类似
+```
+
+---
+
+# 六、系统
+
+## 6.1 生命周期
+
+### TT.GetAppLifeCycle
+```csharp
+public static TTAppLifeCycle GetAppLifeCycle()
+// 事件:
+//   event OnShowEventWithDict OnShow;   // delegate void OnShowEventWithDict(Dictionary<string,object>)
+//   event OnAppHideEvent OnHide;         // delegate void OnAppHideEvent()
+```
+示例:
+```csharp
+var life = TT.GetAppLifeCycle();
+life.OnShow += (param) => { Time.timeScale = 1f; }; // 前台恢复
+life.OnHide += () => { Time.timeScale = 0f; };      // 后台暂停
+```
+
+### TT.SetOnBeforeExitAppListener
+设置退出拦截——返回 true 表示自行处理(如弹窗确认)，false 由系统处理。
+```csharp
+public static void SetOnBeforeExitAppListener(Func<bool> listener)
+```
+
+## 6.2 退出与重启
+```csharp
+public static void RestartMiniProgramSync()  // 同步重启
+public static void ExitMiniProgram()          // 退出
+public static LaunchOption GetLaunchOptionsSync() // 启动参数
+```
+
+## 6.3 版本号
+```csharp
+public static string TTSDKVersion { get; }       // SDK 版本
+public static string GameVersion { get; }         // 游戏版本
+public static string GamePublishVersion { get; }   // 发布版本
+public static string GetContainerVersion()         // 容器版本
+```
+
+## 6.4 系统信息
+
+### TT.GetSystemInfo
+```csharp
+public static SystemInfo GetSystemInfo()
+// 属性: screenWidth, screenHeight, windowWidth, windowHeight, pixelRatio,
+//        platform, brand, model, system, language, version, SDKVersion, safeArea 等
+```
+
+## 6.5 触摸事件
+
+### TTTouch
+全局触摸事件，每个回调携带 List\<TTTouch\>。
+TTTouch 属性: identifier(int), pageX/Y(float), clientX/Y(float), force(float)
+```csharp
+public static event Action<List<TTTouch>> OnTouchStart;
+public static event Action<List<TTTouch>> OnTouchMove;
+public static event Action<List<TTTouch>> OnTouchEnd;
+public static event Action<List<TTTouch>> OnTouchCancel;
+// Off 方法: OffTouchStart/Move/End/Cancel(Action<List<TTTouch>>)
+```
+示例:
+```csharp
+TT.OnTouchStart += (touches) => { foreach (var t in touches) Debug.Log($"Touch: {t.pageX},{t.pageY}"); };
+```
+
+---
+
+# 七、设备
+
+## 7.1 加速度计与陀螺仪
+```csharp
+TT.StartAccelerometer(Action<float,float,float>)  // 加速度计 (x,y,z)
+TT.StopAccelerometer()
+TT.StartGyroscope(Action<float,float,float>)      // 陀螺仪 (x,y,z)
+TT.StopGyroscope()
+TT.OnGyroscopeChange(Action<float,float,float>)    // 陀螺仪(另一种写法)
+```
+
+## 7.2 设备方向
+```csharp
+TT.StartDeviceMotionListening(Action<float,float,float>) // (alpha,beta,gamma)
+TT.StopDeviceMotionListening()
+```
+
+## 7.3 剪贴板
+```csharp
+TT.GetClipboardData(Action<string> callback)
+TT.SetClipboardData(string data, Action<bool> callback = null)
+```
+
+## 7.4 屏幕
+```csharp
+TT.SetKeepScreenOn(bool keepScreenOn)                // 屏幕常亮
+TT.GetScreenBrightness(Action<float> callback)       // 获取亮度(0~1)
+TT.SetScreenBrightness(float value)                  // 设置亮度(0~1)
+```
+
+## 7.5 震动
+```csharp
+TT.Vibrate(bool isLong = false)  // false=短震, true=长震
+```
+
+## 7.6 键盘(物理)
+```csharp
+TT.OnKeyDown(Action<int>) / TT.OffKeyDown(Action<int>)   // 物理按键按下
+TT.OnKeyUp(Action<int>) / TT.OffKeyUp(Action<int>)       // 物理按键释放
+```
+
+## 7.7 鼠标
+```csharp
+TT.OnMouseDown/Move/Up(Action<float,float>)  // 鼠标事件 (x,y)
+TT.OffMouseDown/Move/Up(Action<float,float>) // 取消监听
+```
+
+## 7.8 滚轮
+```csharp
+TT.OnWheel(Action<float>) / TT.OffWheel(Action<float>)   // 滚轮 delta
+```
+
+## 7.9 网络状态
+```csharp
+TT.GetNetWorkType(Action<string> callback)
+// 返回: "wifi"/"2g"/"3g"/"4g"/"5g"/"unknown"/"none"
+```
+
+---
+
+# 八、网络
+
+## 8.1 HTTP 请求
+
+### TT.Request
+发起 HTTP/HTTPS 请求。
+```csharp
+public static void Request(RequestParam param)
+```
+RequestParam: Url(string), Method(string: GET/POST等), Data(string: JSON), Header(Dictionary\<string,string\>), Timeout(int: ms), Success(Action\<string\>), Fail(Action\<string\>), Complete(Action)
+
+示例:
+```csharp
+TT.Request(new RequestParam {
+    Url = "https://api.example.com/data", Method = "POST",
+    Data = "{\"uid\":\"123\"}", Timeout = 10000,
+    Header = new Dictionary<string,string> {{"Authorization", "Bearer xxx"}},
+    Success = (res) => Debug.Log(res),
+    Fail = (err) => Debug.LogError(err)
+});
+```
+
+## 8.2 UDP Socket
+
+### TT.CreateUDPSocket
+```csharp
+public static TTUDPSocket CreateUDPSocket()
+```
+TTUDPSocket 方法: Bind(int port), Close(), Connect(string addr, int port), Send(byte[] data)
+事件: OnMessage(Action\<byte[]\>)/OffMessage, OnClose/OffClose, OnError(Action\<string\>)/OffError, OnListening/OffListening
+
+示例:
+```csharp
+var s = TT.CreateUDPSocket();
+s.OnMessage += (data) => Debug.Log(System.Text.Encoding.UTF8.GetString(data));
+s.Bind(0);
+s.Send(System.Text.Encoding.UTF8.GetBytes("hello"));
+```
+
+---
+
+# 九、存储与文件
+
+## 9.1 数据缓存
+```csharp
+TT.Save(string key, string value, Action<bool> callback = null)
+TT.LoadSaving(string key, Action<string> callback)
+TT.DeleteSaving(string key, Action<bool> callback = null)
+TT.ClearAllSaving(Action<bool> callback = null)
+TT.GetSavingDiskSize(Action<long> callback)
+```
+示例:
+```csharp
+TT.Save("level", "15", (ok) => Debug.Log("saved"));
+TT.LoadSaving("level", (val) => Debug.Log($"level={val}"));
+```
+
+## 9.2 PlayerPrefs (替代 Unity 原生)
+```csharp
+TT.PlayerPrefs.SetInt(key, value)     / GetInt(key, default=0)
+TT.PlayerPrefs.SetFloat(key, value)   / GetFloat(key, default=0f)
+TT.PlayerPrefs.SetString(key, value)  / GetString(key, default="")
+TT.PlayerPrefs.HasKey(key)            // → bool
+TT.PlayerPrefs.DeleteKey(key)         // 删除单个
+TT.PlayerPrefs.DeleteAll()            // 清空全部
+TT.PlayerPrefs.Save()                 // 持久化
+```
+
+## 9.3 文件系统管理器
+
+### TT.GetFileSystemManager
+返回 TTFileSystemManager，提供 32 个文件操作方法。同步与异步一一对应，异步方法无 Sync 后缀且最后参数为 callback。
+```csharp
+public static TTFileSystemManager GetFileSystemManager()
+```
+
+同步方法(后缀 Sync): AccessSync(path)→bool, CopyFileSync/MkdirSync/RenameSync/RmdirSync/UnlinkSync/TruncateSync(src,dest), ReaddirSync(dirPath)→string[], ReadFileSync(path,enc)→string/byte[], WriteFileSync/AppendFileSync(path,data,enc), StatSync(path)→Stats, OpenSync(path,flag)→fd, CloseSync(fd), WriteSync/ReadSync(fd,data/buf,enc), FstatSync(fd)→Stats, FtruncateSync(fd,len)
+
+异步方法: Access/CopyFile/Mkdir/Readdir/ReadFile/WriteFile/AppendFile/Rename/Rmdir/Unlink/Stat/Open/Close/Write/Read/Fstat/Ftruncate/Truncate(同上, 加 callback)
+
+特殊: ReadCompressedFile(path, Action\<string\>), GetSavedFileList(Action\<List\<string\>\>), GetFileInfo(path, Action\<object\>), ReadDir/ReadDirSync(Readdir 别名)
+
+示例:
+```csharp
+var fs = TT.GetFileSystemManager();
+fs.WriteFileSync("save.json", "{\"hp\":100}", "utf8");
+fs.ReadFile("save.json", "utf8", (data) => Debug.Log(data));
+bool exists = fs.AccessSync("save.json");
+```
+---
+
+# 十、媒体与分享
+
+## 10.1 游戏录屏
+
+### TT.GetGameRecorderManager
+```csharp
+public static TTGameRecorderManager GetGameRecorderManager()
+```
+成员: IsShowVideoShareToast(bool get/set), SetEnabled(bool), GetEnabled(Action\<bool\>), SetCustomKeyFrameInterval(int), Start(), Stop(), GetRecordDuration(Action\<long\>), GetVideoRecordState(Action\<int\>), SetDefaultBgm(string), GetVideoShareState(Action\<int\>)
+
+示例:
+```csharp
+var r = TT.GetGameRecorderManager(); r.SetEnabled(true); r.Start();
+/* ... */ r.Stop(); r.GetRecordDuration((d) => Debug.Log($"{d/1000f}秒"));
+```
+
+## 10.2 游戏分享
+```csharp
+public static void ShareAppMessage(ShareParam param)
+// ShareParam: Title, ImageUrl, Query, Extra(Dictionary<string,string>), Success(Action), Fail(Action<string>)
+public static void ShowShareMenu()
+public static void OnShareAppMessage(Func<ShareParam>)  // 自定义分享内容
+public static void OffShareAppMessage()
+public static void NavigateToVideoView(string videoId)   // 跳转视频播放
+```
+示例:
+```csharp
+TT.OnShareAppMessage(() => new ShareParam { Title = "快来玩!", Query = "from=share" });
+TT.ShareAppMessage(new ShareParam { Title = "分享标题" });
+```
+
+---
+
+# 十一、界面与渲染
+
+## 11.1 系统键盘
+
+### TT.ShowKeyboard / TT.HideKeyboard / TT.UpdateKeyboard
+```csharp
+public static void ShowKeyboard(KeyboardParam param)
+public static void HideKeyboard()
+public static void UpdateKeyboard(string value)
+```
+KeyboardParam: DefaultValue(string), MaxLength(int), Multiple(bool), ConfirmHold(bool),
+ConfirmType(string: done/go/next/search/send), Type(string: text/number/idcard/digit)
+
+### 键盘事件
+```csharp
+TT.OnKeyboardComplete(Action<string>) / TT.OffKeyboardComplete(...) // 键盘收起，返回最终值
+TT.OnKeyboardConfirm(Action<string>) / TT.OffKeyboardConfirm(...)   // 确认键点击
+TT.OnKeyboardInput(Action<string>) / TT.OffKeyboardInput(...)       // 输入内容变化
+```
+
+完整示例:
+```csharp
+TT.OnKeyboardInput += (v) => Debug.Log($"输入: {v}");
+TT.OnKeyboardComplete += (v) => Debug.Log($"最终: {v}");
+TT.ShowKeyboard(new KeyboardParam { DefaultValue = "", MaxLength = 10, Type = "text" });
+// 更新值: TT.UpdateKeyboard("new"); 隐藏: TT.HideKeyboard();
+```
+
+## 11.2 敏感词与渲染控制
+```csharp
+TT.SensitiveWordCheck(string text, Action<bool,string>)    // 检测敏感词
+TT.ReplaceSensitiveWords(string text, Action<string>)      // 替换为*
+Cursor.SetCursor(string: default/pointer/text/crosshair)   // 光标样式
+TT.RequestPointerLock(); TT.IsPointerLocked {get}; TT.ExitPointerLock()  // 指针锁定
+TT.SetPreferredFramesPerSecond(int fps)  // 帧率(30/60)
+public static string GetSystemFont()      // 系统字体路径
+```
+
+---
+
+# 十二、抖音云
+
+## 12.1 抖音云服务
+
+### TT.CreateDouyinCloud
+```csharp
+public static TTDouyinCloud CreateDouyinCloud()
+```
+TTDouyinCloud 方法:
+| 方法 | 说明 |
+|------|------|
+| CallContainer(string path, string data, Action\<string\>) | 调用云容器/函数 |
+| GetTempFileUrl(string fileId, Action\<string\>) | 获取云文件临时 URL |
+| DeleteFile(string fileId, Action\<bool\>) | 删除云文件 |
+| UploadFile(string cloudPath, string filePath, Action\<string\>) | 上传到云存储 |
+| DownloadFile(string fileId, string savePath, Action\<bool\>) | 从云存储下载 |
+| CloudDb { get; } | 云数据库实例 |
+
+示例:
+```csharp
+var cloud = TT.CreateDouyinCloud();
+cloud.CallContainer("/api/rank", "{\"zone\":\"1\"}", (r) => Debug.Log(r));
+cloud.UploadFile("cloud://data.json", "local.json", (fid) => Debug.Log(fid));
+```
+
+---
+
+# 附录 A：快速参考
+
+## A.1 C# / JavaScript API 命名对照
+
+| JS `tt.*` | C# `TT.*` | 说明 |
+|------|------|------|
+| `tt.login()` | `TT.Login()` | 登录 |
+| `tt.checkSession()` | `TT.CheckSession()` | 校验 session |
+| `tt.getUserInfo()` | `TT.GetUserInfo(ref u)` | 用户信息 |
+| `tt.request()` | `TT.Request(p)` | HTTP |
+| `tt.getSystemInfo()` | `TT.GetSystemInfo()` | 系统信息 |
+| `tt.requestGamePayment()` | `TT.RequestGamePayment(p)` | 支付 |
+| `tt.createRewardedVideoAd()` | `TT.CreateRewardedVideoAd(p)` | 激励视频 |
+| `tt.createBannerAd()` | `TT.CreateBannerAd(p)` | Banner |
+| `tt.onShow()` | `TT.GetAppLifeCycle().OnShow` | 前台 |
+| `tt.onHide()` | `TT.GetAppLifeCycle().OnHide` | 后台 |
+| `tt.setStorage()` | `TT.Save()` | 存缓存 |
+| `tt.getStorage()` | `TT.LoadSaving()` | 读缓存 |
+| `tt.shareAppMessage()` | `TT.ShareAppMessage(p)` | 分享 |
+| `tt.showKeyboard()` | `TT.ShowKeyboard(p)` | 键盘 |
+| `tt.vibrate()` | `TT.Vibrate()` | 震动 |
+| `tt.getFileSystemManager()` | `TT.GetFileSystemManager()` | 文件 |
+| `tt.getGameRecorderManager()` | `TT.GetGameRecorderManager()` | 录屏 |
+| `tt.getLiveManager()` | `TT.GetLiveManager()` | 直播 |
+## A.2 最佳实践
+1. **初始化优先**: `TT.InitSDK` 必须最先调用，回调中获取环境信息后再初始化游戏逻辑
+2. **环境判断**: 用 `TT.InContainerEnv` 区分 Editor/真机，Editor 下 Mock 处理
+3. **登录前置**: 支付/用户信息等敏感操作前用 `TT.CheckSession` 校验
+4. **生命周期**: 监听 OnShow/OnHide，前台恢复、后台暂停渲染
+5. **订单唯一性**: 支付 CustomId 必须唯一，建议 UUID + 时间戳
+6. **广告复用**: 激励视频单实例，创建一次后重复 Load/Show，及时 Destroy
+7. **异步优先**: 文件操作优先使用异步方法（非 Sync 后缀），避免阻塞主线程
+8. **PlayerPrefs**: Unity 原生不可用，使用 `TT.PlayerPrefs` 替代
+9. **版本兼容**: 用 `TT.CanIUse` 做 API 可用性判断，做好降级
+10. **SDK 版本**: 注意 6.1.1 等版本的 API 变更（Param 类替代旧格式）
