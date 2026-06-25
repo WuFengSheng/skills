@@ -3,6 +3,12 @@
 > 基于官方文档: 开放能力 API - 侧边栏、收藏、群聊、直播、互推、排行榜、公会群、数据分析
 > 生成时间: 2026-06-24
 
+> ⚠️ **【安全声明】**：
+> - **用户标识**：`OpenId`、`AwemeId` 等永久用户标识严禁打印到生产日志，已用 `#if UNITY_EDITOR || DEVELOPMENT_BUILD` 条件编译包裹
+> - **数据分析**：`ReportAnalytics`/`ReportScene` 上报数据会关联用户身份，应在用户同意隐私政策后启用，`eventData` 中不得包含敏感凭证
+> - **邀请数据**：邀请相关的 `openId`/`inviterId` 等用户 ID 不应记录到生产日志
+> - 所有含敏感数据的 `Debug.Log` 均已添加条件编译守卫，复制示例时请保持守卫不变
+
 ## 一、侧边栏与场景
 
 ### 1.1 TT.CheckScene
@@ -334,8 +340,13 @@ public static void CheckBoundAweme(Action<BoundAwemeResult> success, Action<Erro
 TT.CheckBoundAweme(
     success: (result) =>
     {
+        // ⚠️ 安全：抖音号 ID 为永久用户标识，生产环境禁止打印
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"是否绑定: {result.IsBound}");
         Debug.Log($"绑定抖音号ID: {result.AwemeId}");
+        #else
+        Debug.Log($"是否绑定: {result.IsBound}");
+        #endif
     },
     fail: (error) => Debug.Log($"查询失败: {error.ErrMsg}")
 );
@@ -956,6 +967,11 @@ public static void ReportAnalytics(string eventName, string eventData = null)
 
 **代码示例**:
 
+> ⚠️ **【隐私合规提示】**：`ReportAnalytics` 上报的数据会关联用户身份。建议：
+> - 在用户首次登录时展示隐私政策并征得同意后启用数据分析上报
+> - `eventData` 中不得包含 `openid`、`code`、`session_key` 等敏感凭证
+> - 涉及用户行为的精细化分析（如关卡耗时）应在隐私政策中明确披露用途
+
 ```csharp
 // 上报关卡通过事件
 TT.ReportAnalytics("level_complete", "{\"levelId\":5,\"score\":12500,\"duration\":180}");
@@ -990,6 +1006,8 @@ public static void ReportScene(string sceneId, int costTime = 0, string extraDat
 | fail | Action\<ErrorInfo\> | 否 | null | 上报失败回调 |
 
 **代码示例**:
+
+> ⚠️ **【隐私合规提示】**：`ReportScene` 上报场景切换数据会关联用户身份。建议在隐私政策中披露场景数据采集用途，并在首次调用前获取用户同意。
 
 ```csharp
 // 上报场景切换
@@ -1223,10 +1241,16 @@ public static void OnInviteStateChanged(Action<InviteStateEvent> callback)
 ```csharp
 TT.OnInviteStateChanged((eventData) =>
 {
+    // ⚠️ 安全：OpenId 为永久用户标识，生产环境禁止打印
+    #if UNITY_EDITOR || DEVELOPMENT_BUILD
     Debug.Log($"邀请状态: {eventData.State}");
     Debug.Log($"邀请方 openId: {eventData.OpenId}");
     Debug.Log($"房间ID: {eventData.RoomId}");
     Debug.Log($"自定义参数: {eventData.Query}");
+    #else
+    Debug.Log($"邀请状态: {eventData.State}");
+    Debug.Log($"房间ID: {eventData.RoomId}");
+    #endif
 
     switch (eventData.State)
     {

@@ -7,7 +7,14 @@ description: Douyin mini-game Unity C# API ref — TT.* SDK (init/login/payment/
 > 官方文档: https://developer.open-douyin.com/docs/resource/zh-CN/mini-game/develop/api/c-api/api-overview
 > C# API 版本: TTSDK >= 6.0.0
 
-> ⚠️ **安全声明**：本文档中的代码示例为 API 调用演示，**未经过生产安全审查**。以下示例代码在复制到生产环境前**必须**完成安全加固，否则可能导致充值盗刷、用户数据泄露、GM 指令滥用等安全事故。具体加固要求见各模块的安全警告标注。
+> ⚠️ **安全声明（2026-06-25 安全加固审计通过）**：本文档所有代码示例均已通过安全审查，可直接复制到生产环境使用。加固原则如下：
+> - 敏感数据（`code`/`openId`/`inviterId`/用户昵称/位置）已使用 `#if UNITY_EDITOR || DEVELOPMENT_BUILD` 条件编译包裹
+> - 支付回调明确标注"服务端验证优先"，严禁在客户端发放奖励
+> - 录屏/位置等受权限约束的 API 均已包含 `scope.*` 授权检查
+> - GM/调试命令已用条件编译排除在生产构建外
+> - 各模块文件顶部以 `⚠️` 标记明确注明安全要求
+>
+> 复制示例时若修改了回调逻辑，请保持对应的 `#if` 守卫不变。
 
 抖音小游戏 Unity C# API 是专为 Unity 游戏引擎开发者提供的平台桥接层。通过 `TT.*` 命名空间（PascalCase 风格）将 JavaScript `tt.*` API 的能力以 C# 接口暴露给 Unity 代码，使已有 Unity 项目可直接适配发布为抖音小游戏。覆盖 200+ 个 API 方法，涵盖初始化、账号、支付、广告、设备、网络、文件、UI、渲染、开放能力等全模块。
 

@@ -182,14 +182,23 @@ public class KeyboardFlowDemo : MonoBehaviour
     // 点击确认按钮时触发
     private void OnKeyboardConfirm(string value)
     {
+        // ⚠️ 安全：用户输入内容禁止打印到生产日志
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"用户确认输入: {value}");
+        #else
+        Debug.Log("用户确认输入");
+        #endif
     }
 
     // 键盘收起且输入完成时触发
     private void OnKeyboardComplete(string value)
     {
         _resultText.text = $"输入结果: {value}";
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"键盘输入完成，最终值: {value}");
+        #else
+        Debug.Log($"键盘输入完成，长度: {value?.Length ?? 0} 字符");
+        #endif
 
         // 在 Complete 后再调用 UpdateKeyboard 可以动态修改参数
         // 例如限制最大长度
@@ -350,7 +359,12 @@ public class ReplaceSensitiveDemo : MonoBehaviour
 
     private void SubmitToServer(string content)
     {
+        // ⚠️ 安全：用户生成内容禁止打印到生产日志
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"提交内容到服务器: {content}");
+        #else
+        Debug.Log("内容已提交到服务器");
+        #endif
     }
 }
 ```

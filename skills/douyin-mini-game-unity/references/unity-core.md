@@ -3,6 +3,12 @@
 > 基于官方文档: https://developer.open-douyin.com/docs/resource/zh-CN/mini-game/develop/api/c-api/api-overview
 > 生成时间: 2026-06-24
 
+> ⚠️ **【安全声明】**：
+> - **登录凭证**：`code` 为临时登录凭证，严禁打印到生产日志，已用 `#if UNITY_EDITOR || DEVELOPMENT_BUILD` 包裹
+> - **位置数据**：`GetLocation()` 返回的经纬度为敏感数据，生产环境禁止打印日志
+> - **GM 命令**：`RegisterCommandEvent` 注册的调试命令**必须**用条件编译包裹，生产包中严禁保留（已在本文件中修正）
+> - **AppId**：`GameAppId` 虽非凭证，但不应在生产日志中暴露应用内部标识
+
 ## 一、SDK 初始化
 
 ### 1.1 TT.InitSDK
@@ -88,8 +94,19 @@ if (TT.InContainerEnv)
     // 真机容器环境
     Debug.Log("运行在抖音小游戏容器中");
     TT.Login(
-        (code, anonymousCode, isLogin) => Debug.Log($"登录成功: {code}"),
-        (errMsg) => Debug.LogError($"登录失败: {errMsg}")
+        (code, anonymousCode, isLogin) =>
+        {
+            // ⚠️ 安全：code 为敏感凭证，生产环境禁止打印
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
+            Debug.Log($"登录成功: code={code}");
+            #endif
+        },
+        (errMsg) =>
+        {
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
+            Debug.LogError($"登录失败: {errMsg}");
+            #endif
+        }
     );
 }
 else
@@ -155,8 +172,11 @@ TT.InitSDK((code, env) =>
     Debug.Log($"Scheme Query: {env.GetQueryFromScheme()}");
 
     // 地域信息
+    // ⚠️ 安全：位置信息为敏感数据，生产环境禁止打印
+    #if UNITY_EDITOR || DEVELOPMENT_BUILD
     var location = env.GetLocation();
     Debug.Log($"位置: 经度={location.Longitude}, 纬度={location.Latitude}");
+    #endif
 
     // 启动参数
     var launchOption = env.GetLaunchOptionsSync();
@@ -422,6 +442,8 @@ public static void EnableTTSDKDebugToast(bool enable)
 
 **说明**: 注册宿主下发的自定义命令事件监听。宿主可通过特定通道向小游戏下发命令，游戏侧通过此方法注册监听以接收并处理命令。
 
+> ⚠️ **【安全警告 — 调试命令生产禁用】**：`RegisterCommandEvent` 用于注册开发者工具下发的自定义命令，**仅限开发调试阶段使用**。注册的 GM 指令**必须**用条件编译（`#if UNITY_EDITOR || DEVELOPMENT_BUILD`）包裹，生产包中**严禁**保留任何调试命令入口。`add_resource`、`jump_level` 等 GM 指令在生产环境中会直接导致经济系统崩溃和作弊泛滥。
+
 **语法**:
 
 ```csharp
@@ -439,14 +461,21 @@ public static void RegisterCommandEvent(Action<string> callback)
 ```csharp
 void OnEnable()
 {
+    // ⚠️ 安全强制：调试命令仅在开发版本中注册，生产包中严禁保留
+    #if UNITY_EDITOR || DEVELOPMENT_BUILD
     TT.RegisterCommandEvent(OnCommandReceived);
+    #else
+    Debug.Log("生产环境：调试命令已禁用");
+    #endif
 }
 
 void OnDisable()
 {
-    // 注意: 确保在对象销毁前取消注册，避免内存泄漏
+    // 注意: 当前 API 不提供 UnregisterCommandEvent，此方法为文档性占位
+    // 生产环境中此回调不会触发，因为 RegisterCommandEvent 未被调用
 }
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
 private void OnCommandReceived(string command)
 {
     Debug.Log($"收到宿主命令: {command}");
@@ -476,6 +505,7 @@ private void OnCommandReceived(string command)
         Debug.LogError($"命令解析失败: {e.Message}");
     }
 }
+#endif
 ```
 
 ---

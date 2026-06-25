@@ -3,6 +3,11 @@
 > 基于官方文档: 存储 API - 数据缓存、PlayerPrefs、文件系统
 > 生成时间: 2026-06-24
 
+> ⚠️ **【安全声明】**：
+> - **玩家数据**：`Save`/`LoadSaving` 存储的玩家档案包含用户个人信息（昵称、游戏进度等），生产环境禁止打印完整 JSON
+> - **PlayerPrefs**：`PlayerPrefs.GetString` 获取的玩家名称等信息禁止打印到生产日志，已用 `#if UNITY_EDITOR || DEVELOPMENT_BUILD` 包裹
+> - **文件路径**：避免在生产日志中暴露应用沙盒目录结构
+
 ## 一、数据缓存
 
 数据缓存提供轻量级的持久化键值对存储，适合保存游戏设置、玩家偏好、存档摘要等少量结构化数据。底层为异步写入，数据存储在宿主 App 为小游戏分配的专用存储空间中。
@@ -112,7 +117,12 @@ public class SaveManager : MonoBehaviour
     {
         string json = JsonUtility.ToJson(profile);
         TT.Save(SAVE_KEY_PROFILE, json);
+        // ⚠️ 安全：玩家档案包含个人信息，禁止打印完整 JSON 到生产日志
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"玩家档案已保存: {json}");
+        #else
+        Debug.Log("玩家档案已保存");
+        #endif
     }
 
     /// <summary>
@@ -384,8 +394,13 @@ public class GameSettingsManager : MonoBehaviour
         int highScore = TT.PlayerPrefs.GetInt(KEY_HIGH_SCORE, 0);
         string playerName = TT.PlayerPrefs.GetString(KEY_PLAYER_NAME, "新玩家");
 
+        // ⚠️ 安全：玩家名称为个人信息，生产环境禁止打印
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"设置加载完成: 音乐={musicVolume}, 音效={sfxVolume}, " +
                   $"最高分={highScore}, 玩家名={playerName}");
+        #else
+        Debug.Log($"设置加载完成: 音乐={musicVolume}, 音效={sfxVolume}, 最高分={highScore}");
+        #endif
 
         ApplySettings(musicVolume, sfxVolume);
     }

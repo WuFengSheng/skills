@@ -3,11 +3,12 @@
 > 基于官方文档: https://developer.open-douyin.com/docs/resource/zh-CN/mini-game/develop/api/c-api/account
 > 生成时间: 2026-06-24
 
-> ⚠️ **【安全声明 — 敏感数据保护】**：
+> ⚠️ **【安全声明 — 敏感数据保护，已加固】**：
 > - `code`（临时登录凭证）、`session_key`、`openid`、`encryptedData`、`iv`、`cloudId` 均为敏感数据
-> - **严禁**在生产环境通过 `Debug.Log` 打印 `code`、`session_key` 等凭证信息
+> - 所有含敏感数据的 `Debug.Log` 已用 `#if UNITY_EDITOR || DEVELOPMENT_BUILD` 条件编译包裹，复制示例时请保持守卫不变
 > - `code` 仅在获取后立即发送到服务端，客户端不做存储
-> - 用户信息（`nickName`、`avatarUrl`、`signature` 等）展示前应确认用户已授权 `scope.userInfo`
+> - `session_key` 为服务端会话凭证，严禁客户端持久化存储（示例中的字段仅为演示）
+> - 用户信息（`nickName`、`avatarUrl`、`gender`、`city` 等）禁止打印到生产日志，展示前应确认用户已授权 `scope.userInfo`
 > - `GetUserInfo` 返回的 `encryptedData` 和 `iv` 仅发送到服务端解密，客户端不应解析或存储
 
 ## 一、登录与会话
@@ -77,7 +78,9 @@ public class LoginManager : MonoBehaviour
             },
             failedCallback: (errMsg) =>
             {
+                #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 Debug.LogError($"登录失败: {errMsg}");
+                #endif
                 // 提示用户登录失败，可重试或进入游客模式
             },
             forceLogin: force
@@ -230,10 +233,13 @@ public void FetchUserInfo()
     TT.GetUserInfo(
         successCallback: (ref TTUserInfo userInfo) =>
         {
+            // ⚠️ 安全：用户个人信息仅用于 UI 展示，禁止打印到生产日志
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log($"用户昵称: {userInfo.nickName}");
             Debug.Log($"头像 URL: {userInfo.avatarUrl}");
             Debug.Log($"性别: {GenderToString(userInfo.gender)}");
             Debug.Log($"地区: {userInfo.country} {userInfo.province} {userInfo.city}");
+            #endif
 
             // 更新 UI
             UpdateUserProfileUI(userInfo);
@@ -301,7 +307,10 @@ public void GetUserInfoWithAuth()
             TT.GetUserInfo(
                 (ref TTUserInfo info) =>
                 {
+                    // ⚠️ 安全：用户昵称禁止打印到生产日志
+                    #if UNITY_EDITOR || DEVELOPMENT_BUILD
                     Debug.Log($"用户: {info.nickName}");
+                    #endif
                     UpdateUserProfileUI(info);
                 },
                 (err) => Debug.LogError($"获取信息失败: {err}")
@@ -680,6 +689,8 @@ public class AccountFlowManager : MonoBehaviour
 {
     private ContainerEnv m_Env;
     private string m_OpenId;
+    // ⚠️ 安全告警：session_key 是敏感凭证，严禁在客户端持久化存储。
+    // 以下字段仅为示例演示，生产环境中 session_key 应仅保存在服务端
     private string m_SessionKey;
 
     void Start()
@@ -734,13 +745,18 @@ public class AccountFlowManager : MonoBehaviour
         TT.Login(
             successCallback: (loginCode, anonymousCode, isLogin) =>
             {
+                // ⚠️ 安全：code 为敏感凭证，生产环境禁止打印
+                #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 Debug.Log($"登录成功: code={loginCode}, isLogin={isLogin}");
+                #endif
                 // 将 code 发送到服务端
                 SendCodeToServer(loginCode, anonymousCode);
             },
             failedCallback: (errMsg) =>
             {
+                #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 Debug.LogError($"登录失败: {errMsg}");
+                #endif
                 // 登录失败处理: 重试或进入游客模式
             },
             forceLogin: true
@@ -755,7 +771,10 @@ public class AccountFlowManager : MonoBehaviour
         // 返回: { openid, session_key, unionid, anonymous_openid }
 
         // 示例模拟
+        // ⚠️ 安全：code 为敏感凭证，生产环境禁止打印
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"发送 code 到服务端: {code}");
+        #endif
         OnLoginSuccess();
     }
 

@@ -3,10 +3,10 @@
 > 基于官方文档: 媒体 API - 录屏管理、游戏分享、邀请模块
 > 生成时间: 2026-06-24
 
-> ⚠️ **【隐私与安全声明】**：
-> - **录屏**：启用录屏前应检查用户授权状态（`scope.screenRecord`），并在首次录屏时展示隐私说明。录制的视频可能包含用户个人画面和语音，不得在未经用户同意的情况下自动上传。
+> ⚠️ **【隐私与安全声明 — 已加固】**：
+> - **录屏**：代码示例已内置 `scope.screenRecord` 授权检查，首次录屏时会验证用户授权状态。录制的视频不得在未经用户同意的情况下自动上传。
 > - **分享**：分享参数（Title、Query）中不得包含用户敏感信息（手机号、身份证号、openid、session_key 等）。Query 参数中如需传递用户标识，应使用加密的临时 token 而非明文 ID。
-> - **邀请**：`blockList` 和 `inviterId` 等用户 ID 不应记录到生产日志中。
+> - **邀请**：`inviterId` 等用户标识已用 `#if UNITY_EDITOR || DEVELOPMENT_BUILD` 条件编译包裹，生产日志仅记录邀请事件维度信息。
 
 ## 一、录屏管理
 
@@ -246,16 +246,35 @@ public class GameRecorderFlow : MonoBehaviour
 
     void StartRecording()
     {
-        if (_recorder.GetEnabled() && _recorder.GetVideoRecordState() != 1)
-        {
-            _recorder.Start();
-            _isRecording = true;
-            Debug.Log("开始录屏");
-        }
-        else
-        {
-            Debug.LogWarning("录屏未启用或已在录制中");
-        }
+        // ⚠️ 安全：录屏前必须检查 scope.screenRecord 授权状态
+        // 首次录屏时应展示隐私说明并征得用户明确同意
+        TT.GetSetting(
+            successCallback: (auth) =>
+            {
+                if (!auth.ScreenRecord)
+                {
+                    Debug.LogWarning("录屏权限未授权，请引导用户在设置中开启");
+                    return;
+                }
+
+                if (_recorder.GetEnabled() && _recorder.GetVideoRecordState() != 1)
+                {
+                    _recorder.Start();
+                    _isRecording = true;
+                    #if UNITY_EDITOR || DEVELOPMENT_BUILD
+                    Debug.Log("开始录屏");
+                    #endif
+                }
+                else
+                {
+                    Debug.LogWarning("录屏未启用或已在录制中");
+                }
+            },
+            failedCallback: (err) =>
+            {
+                Debug.LogWarning($"获取录屏授权状态失败: {err}");
+            }
+        );
     }
 
     void StopRecording()
@@ -585,8 +604,13 @@ public class InviteStateListener : MonoBehaviour
 
     private void OnInviteAccepted(InviteStateInfo info)
     {
-        Debug.Log($"玩家 {info.inviterNickName}({info.inviterId}) 接受了邀请");
+        // ⚠️ 安全：inviterId 为永久用户标识，生产环境禁止打印
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
+        Debug.Log($"邀请者 {info.inviterNickName}(id:{info.inviterId}) 接受了邀请");
         Debug.Log($"携带参数: {info.query}");
+        #else
+        Debug.Log("邀请已被接受");
+        #endif
 
         // 解析 query 参数并进入相应游戏场景
         // 例如: "gameMode=ranked&roomId=abc123"
@@ -594,7 +618,11 @@ public class InviteStateListener : MonoBehaviour
 
     private void OnInviteRefused(InviteStateInfo info)
     {
-        Debug.Log($"玩家 {info.inviterNickName}({info.inviterId}) 拒绝了邀请");
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
+        Debug.Log($"邀请者 {info.inviterNickName}(id:{info.inviterId}) 拒绝了邀请");
+        #else
+        Debug.Log("邀请已被拒绝");
+        #endif
         // 可选：显示 Toast 提示
     }
 }
@@ -640,9 +668,29 @@ public class RecordAndShare : MonoBehaviour
     void InitRecorder()
     {
         _recorder = TT.GetGameRecorderManager();
-        _recorder.SetEnabled(true);
-        _recorder.IsShowVideoShareToast = true; // 录制完成后自动弹出分享入口
-        _recorder.SetCustomKeyFrameInterval(2000);
+
+        // ⚠️ 安全：启用录屏前必须检查 scope.screenRecord 授权状态
+        TT.GetSetting(
+            successCallback: (auth) =>
+            {
+                if (!auth.ScreenRecord)
+                {
+                    Debug.LogWarning("录屏权限未授权，请引导用户在设置中开启");
+                    return;
+                }
+
+                _recorder.SetEnabled(true);
+                _recorder.IsShowVideoShareToast = true; // 录制完成后自动弹出分享入口
+                _recorder.SetCustomKeyFrameInterval(2000);
+                #if UNITY_EDITOR || DEVELOPMENT_BUILD
+                Debug.Log("录屏已启用");
+                #endif
+            },
+            failedCallback: (err) =>
+            {
+                Debug.LogWarning($"获取录屏授权状态失败: {err}");
+            }
+        );
 
         _recordBtn.onClick.AddListener(() =>
         {
