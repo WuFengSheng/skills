@@ -59,12 +59,15 @@ public class GameLifecycle : MonoBehaviour
         Debug.Log("游戏进入前台");
 
         // 解析启动参数
+        // ⚠️ 安全：query 可能包含邀请 token/用户标识等敏感数据，生产环境禁止打印
         if (param != null)
         {
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
             if (param.ContainsKey("scene"))
                 Debug.Log($"场景值: {param["scene"]}");
             if (param.ContainsKey("query"))
                 Debug.Log($"启动参数: {param["query"]}");
+            #endif
         }
 
         // 恢复游戏逻辑
@@ -255,12 +258,15 @@ void Start()
         Debug.Log($"启动来源: {launchOptions.LaunchFrom}");
 
         // 解析 query 参数
+        // ⚠️ 安全：Query 可能包含邀请 token/用户标识，生产环境禁止打印
         if (launchOptions.Query != null)
         {
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
             foreach (var kv in launchOptions.Query)
             {
                 Debug.Log($"Query[{kv.Key}] = {kv.Value}");
             }
+            #endif
 
             // 示例：从分享链接进入，跳转指定关卡
             if (launchOptions.Query.ContainsKey("level"))
@@ -389,10 +395,13 @@ void Start()
             success: (info) =>
             {
                 // 设备信息
+                // ⚠️ 安全：品牌/型号/系统版本组合可用于设备指纹，生产环境禁止全量打印
+                #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 Debug.Log($"设备品牌: {info["brand"]}");
                 Debug.Log($"设备型号: {info["model"]}");
                 Debug.Log($"系统版本: {info["system"]}");
                 Debug.Log($"平台: {info["platform"]}");
+                #endif
 
                 // 屏幕信息
                 float screenW = Convert.ToSingle(info["screenWidth"]);
@@ -589,10 +598,15 @@ rtLogger.SetFilterMsg("keyword_filter"); // 设置过滤关键词，方便后台
 
 ```csharp
 // 监听未捕获的全局异常
+// ⚠️ 安全：生产环境禁止打印完整堆栈，避免泄露代码结构/文件路径
 TT.OnError += (error) =>
 {
+    #if UNITY_EDITOR || DEVELOPMENT_BUILD
     Debug.LogError($"全局错误: {error.Message}");
     Debug.LogError($"错误堆栈: {error.Stack}");
+    #else
+    Debug.LogError($"全局错误: {error.Message}");  // 生产仅记录错误消息
+    #endif
 };
 ```
 

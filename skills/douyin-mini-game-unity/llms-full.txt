@@ -57,11 +57,14 @@ public class GameBootstrap : MonoBehaviour
         {
             if (code == 0)
             {
+                // ⚠️ 安全：环境信息含 AppId，生产环境禁止打印
+                #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 Debug.Log($"SDK 初始化成功");
                 Debug.Log($"宿主环境: {env.m_HostEnum}");
                 Debug.Log($"启动来源: {env.m_LaunchFromEnum}");
                 Debug.Log($"AppId: {env.GameAppId}");
                 Debug.Log($"版本类型: {env.GetVersionType()}");
+                #endif
             }
             else
             {
@@ -162,7 +165,8 @@ TT.InitSDK((code, env) =>
 {
     if (code != 0) return;
 
-    // 环境信息
+    // ⚠️ 安全：环境信息含 AppId/地域等敏感数据，生产环境禁止打印
+    #if UNITY_EDITOR || DEVELOPMENT_BUILD
     Debug.Log($"AppId: {env.GameAppId}");
     Debug.Log($"宿主: {env.m_HostEnum}");                     // 抖音/抖音极速版/头条等
     Debug.Log($"启动来源: {env.m_LaunchFromEnum}");            // 搜索/桌面/分享等
@@ -173,7 +177,6 @@ TT.InitSDK((code, env) =>
 
     // 地域信息
     // ⚠️ 安全：位置信息为敏感数据，生产环境禁止打印
-    #if UNITY_EDITOR || DEVELOPMENT_BUILD
     var location = env.GetLocation();
     Debug.Log($"位置: 经度={location.Longitude}, 纬度={location.Latitude}");
     #endif
@@ -326,19 +329,25 @@ TT.InitSDK((code, env) =>
     Debug.Log($"桌面快捷方式: {launchOption.IsSticky}");
 
     // Query 参数（如 Scheme 拉起时携带的参数）
+    // ⚠️ 安全：Query 可能包含邀请 token 等敏感数据，生产环境禁止打印
     if (launchOption.Query != null)
     {
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         foreach (var kv in launchOption.Query)
         {
             Debug.Log($"Query 参数: {kv.Key} = {kv.Value}");
         }
+        #endif
     }
 
     // 分享相关
     if (!string.IsNullOrEmpty(launchOption.ShareTicket))
     {
+        // ⚠️ 安全：ShareTicket 为授权票据，GroupId 关联用户社交上下文，生产环境禁止打印
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"分享票据: {launchOption.ShareTicket}");
         Debug.Log($"群 ID: {launchOption.GroupId}");
+        #endif
     }
 
     // 来源信息
@@ -2408,19 +2417,30 @@ public class RewardedAdManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 广告关闭回调 —— 在此发放奖励
+    /// 广告关闭回调 —— ⚠️ 安全：严禁在此直接发放奖励
     /// </summary>
+    /// <remarks>
+    /// ⚠️ 【安全强制】：客户端的 `isEnded` 信号可被伪造/重放。
+    /// 正确做法：OnClose 中仅记录广告事件并发送到服务端，
+    /// 由服务端验证广告回调签名后再下发奖励。
+    /// 以下示例展示安全模式 —— 客户端标记"待验证"，服务端验证后推送奖励。
+    /// </remarks>
     void OnAdClosed(bool isEnded, int count)
     {
         if (isEnded)
         {
-            // 用户完整观看了视频，发放奖励
-            Debug.Log($"用户观看完成，第{count + 1}次观看，发放奖励");
-            GrantReward();
+            // ⚠️ 安全：客户端仅标记"待验证"，不直接发放奖励
+            // 将广告完成事件上报服务端，由服务端验证后下发奖励
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
+            Debug.Log($"用户观看完成，第{count + 1}次观看，上报服务端验证");
+            #endif
+            RequestServerVerifyReward(count);
         }
         else
         {
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log("用户提前关闭广告，不发放奖励");
+            #endif
         }
 
         // 关闭后重新加载，为下次展示做准备
@@ -2439,10 +2459,37 @@ public class RewardedAdManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 发放奖励的业务逻辑
+    /// ⚠️ 安全：请求服务端验证广告完成事件并发放奖励
+    /// </summary>
+    /// <remarks>
+    /// 客户端绝不可根据 isEnded 直接发放奖励。
+    /// 正确流程：1) 上报广告事件到服务端 → 2) 服务端验证广告回调签名
+    /// → 3) 服务端通过长连接/轮询通知客户端发放奖励。
+    /// 支付模块已展示完整服务端验签模式，广告模块同理。
+    /// </remarks>
+    void RequestServerVerifyReward(int count)
+    {
+        // 将广告完成事件上报到服务端
+        // 服务端验证后通过长连接或轮询下发奖励指令
+        // 参考 unity-payment.md 中的服务端验签模式
+        StartCoroutine(ServerVerifyAdRewardCoroutine(count));
+    }
+
+    private System.Collections.IEnumerator ServerVerifyAdRewardCoroutine(int count)
+    {
+        // 发送广告验证请求到服务端
+        // POST /api/ad/verify { adUnitId, userId, watchCount, timestamp, signature }
+        // 轮询等待服务端验证结果
+        // 验证通过后服务端推送奖励 → 客户端执行 GrantReward()
+        yield return null;
+    }
+
+    /// <summary>
+    /// 发放奖励（仅由服务端验证通过后调用）
     /// </summary>
     void GrantReward()
     {
+        // ⚠️ 安全：此方法仅在服务端验证通过后才被调用
         // 示例：增加金币、复活次数等
         // GameManager.Instance.AddCoin(100);
     }
@@ -2483,13 +2530,17 @@ var param = new CreateRewardedVideoAdParam
 };
 
 var videoAd = TT.CreateRewardedVideoAd(param);
+// ⚠️ 安全：多样本模式下同样需要服务端验证，不可根据客户端 isEnded 直接发奖
 videoAd.OnClose += (isEnded, count) =>
 {
     if (isEnded)
     {
         // count 从 0 开始：0=首次，1=第1次再得，2=第2次再得...
-        Debug.Log($"第{count + 1}次观看完成");
-        GrantMultitonReward(count);
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
+        Debug.Log($"第{count + 1}次观看完成，上报服务端验证");
+        #endif
+        // ⚠️ 安全：上报服务端验证，不可直接发放奖励
+        RequestServerVerifyMultitonReward(count);
     }
 };
 ```
@@ -2825,12 +2876,15 @@ public class GameLifecycle : MonoBehaviour
         Debug.Log("游戏进入前台");
 
         // 解析启动参数
+        // ⚠️ 安全：query 可能包含邀请 token/用户标识等敏感数据，生产环境禁止打印
         if (param != null)
         {
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
             if (param.ContainsKey("scene"))
                 Debug.Log($"场景值: {param["scene"]}");
             if (param.ContainsKey("query"))
                 Debug.Log($"启动参数: {param["query"]}");
+            #endif
         }
 
         // 恢复游戏逻辑
@@ -3021,12 +3075,15 @@ void Start()
         Debug.Log($"启动来源: {launchOptions.LaunchFrom}");
 
         // 解析 query 参数
+        // ⚠️ 安全：Query 可能包含邀请 token/用户标识，生产环境禁止打印
         if (launchOptions.Query != null)
         {
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
             foreach (var kv in launchOptions.Query)
             {
                 Debug.Log($"Query[{kv.Key}] = {kv.Value}");
             }
+            #endif
 
             // 示例：从分享链接进入，跳转指定关卡
             if (launchOptions.Query.ContainsKey("level"))
@@ -3155,10 +3212,13 @@ void Start()
             success: (info) =>
             {
                 // 设备信息
+                // ⚠️ 安全：品牌/型号/系统版本组合可用于设备指纹，生产环境禁止全量打印
+                #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 Debug.Log($"设备品牌: {info["brand"]}");
                 Debug.Log($"设备型号: {info["model"]}");
                 Debug.Log($"系统版本: {info["system"]}");
                 Debug.Log($"平台: {info["platform"]}");
+                #endif
 
                 // 屏幕信息
                 float screenW = Convert.ToSingle(info["screenWidth"]);
@@ -3355,10 +3415,15 @@ rtLogger.SetFilterMsg("keyword_filter"); // 设置过滤关键词，方便后台
 
 ```csharp
 // 监听未捕获的全局异常
+// ⚠️ 安全：生产环境禁止打印完整堆栈，避免泄露代码结构/文件路径
 TT.OnError += (error) =>
 {
+    #if UNITY_EDITOR || DEVELOPMENT_BUILD
     Debug.LogError($"全局错误: {error.Message}");
     Debug.LogError($"错误堆栈: {error.Stack}");
+    #else
+    Debug.LogError($"全局错误: {error.Message}");  // 生产仅记录错误消息
+    #endif
 };
 ```
 
@@ -3402,7 +3467,8 @@ if (TT.CanIUse("CreateRewardedVideoAd.object.Multiton"))
 
 > ⚠️ **【安全声明】**：
 > - **剪贴板**：读写系统剪贴板前应获得用户明确同意，避免静默读取。读取到内容后做最小化处理，写入内容不得包含用户个人隐私信息（已在对应示例中标注）
-> - **传感器**：加速度计、陀螺仪等传感器数据本身不敏感，但持续的传感器日志可能用于行为指纹分析，建议用条件编译管理
+> - **传感器**：加速度计、陀螺仪、设备方向等传感器**无需 scope 授权**即可使用，但应遵循 OnEnable/OnDisable 生命周期管理，避免后台持续采集导致耗电（详见「十一、设备能力最佳实践」）。传感器原始数据本身不敏感，但持续高频的传感器日志可能用于行为指纹分析，建议高频日志用条件编译管理
+> - **位置**：位置 API（`GetLocation`）不在本文档覆盖范围内。如需使用，调用前必须做 `scope.userLocation` 授权检查，且经纬度数据为敏感信息，生产环境禁止打印日志
 > - **网络状态**：网络类型信息在客户端属于低风险数据，服务端采集时应在隐私政策中披露
 
 ## 一、加速度计
@@ -4551,12 +4617,23 @@ public class SaveManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 清空所有存档（需用户确认）
+    /// 清空所有存档（⚠️ 不可逆，必须用户确认后执行）
     /// </summary>
     public void ClearAllSaveData()
     {
-        TT.ClearAllSaving();
-        Debug.Log("全部存档已清空");
+        // ⚠️ 安全：不可逆操作，调用前必须弹窗获得用户明确确认
+        ShowConfirmDialog("确定要清空所有存档吗？此操作不可撤销！", () =>
+        {
+            TT.ClearAllSaving();
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
+            Debug.Log("全部存档已清空");
+            #endif
+        });
+    }
+
+    private void ShowConfirmDialog(string message, System.Action onConfirm)
+    {
+        // 展示确认弹窗，用户确认后才执行 onConfirm
     }
 
     /// <summary>
@@ -4814,12 +4891,18 @@ public class GameSettingsManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 重置所有设置
+    /// 重置所有设置（⚠️ 不可逆，必须用户确认后执行）
     /// </summary>
     public void ResetAllSettings()
     {
-        TT.PlayerPrefs.DeleteAll();
-        Debug.Log("所有设置已重置");
+        // ⚠️ 安全：DeleteAll 不可逆，调用前必须弹窗获得用户明确确认
+        ShowConfirmDialog("确定要重置所有设置吗？此操作不可撤销！", () =>
+        {
+            TT.PlayerPrefs.DeleteAll();
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
+            Debug.Log("所有设置已重置");
+            #endif
+        });
     }
 
     private void ApplySettings(float musicVol, float sfxVol)
@@ -5465,18 +5548,24 @@ public class FileSystemSaveManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 清理所有数据
+    /// 清理所有数据（⚠️ 极度危险：递归删除全部文件，不可逆，必须用户确认后执行）
     /// </summary>
     public void ClearAllData()
     {
-        if (m_Fs == null) return;
-
-        if (m_Fs.AccessSync(m_DataDir))
+        // ⚠️ 安全：递归删除全部数据不可逆，调用前必须弹窗获得用户明确确认
+        ShowConfirmDialog("确定要清理所有数据吗？此操作将删除全部存档、配置和日志，不可撤销！", () =>
         {
-            m_Fs.RmdirSync(m_DataDir, true);
-        }
-        InitDirectory();
-        Debug.Log("全部数据已清理并重新初始化");
+            if (m_Fs == null) return;
+
+            if (m_Fs.AccessSync(m_DataDir))
+            {
+                m_Fs.RmdirSync(m_DataDir, true);
+            }
+            InitDirectory();
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
+            Debug.Log("全部数据已清理并重新初始化");
+            #endif
+        });
     }
 }
 
@@ -5769,7 +5858,9 @@ public class RecorderDemo : MonoBehaviour
     void Start()
     {
         _recorder = TT.GetGameRecorderManager();
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log("录屏管理器已获取");
+        #endif
     }
 }
 ```
@@ -5838,7 +5929,7 @@ public void SetCustomKeyFrameInterval(int interval)
 
 ### 1.6 Start
 
-**说明**: 开始录屏。调用前需确保已启用录屏（`SetEnabled(true)`），且当前不在录制中。重复调用不会产生叠加录制。
+**说明**: 开始录屏。调用前需确保已通过 `TT.GetSetting()` 检查 `scope.screenRecord` 授权状态、已启用录屏（`SetEnabled(true)`），且当前不在录制中。重复调用不会产生叠加录制。完整的授权检查模式参见下方「1.12 录屏完整流程示例」及「四、录屏分享最佳实践」。
 
 **语法**:
 
@@ -6017,7 +6108,9 @@ public class GameRecorderFlow : MonoBehaviour
         {
             _recorder.Stop();
             _isRecording = false;
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log($"录屏已停止，总时长: {_recorder.GetRecordDuration()}ms");
+            #endif
 
             // 检查是否有待分享的视频
             if (_recorder.GetVideoShareState() == 1)
@@ -6031,7 +6124,9 @@ public class GameRecorderFlow : MonoBehaviour
     {
         // 分享视频的入口由 IsShowVideoShareToast 控制
         // 此处可引导用户进行分享操作
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log("用户点击了分享视频按钮");
+        #endif
     }
 
     void OnDestroy()
@@ -6192,8 +6287,10 @@ public class CustomShareHandler : MonoBehaviour
         param.Query = $"scene=invite&level={_currentLevel}&score={_currentScore}";
         param.Extra = "custom_share_callback";
 
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"自定义分享标题: {param.Title}");
         Debug.Log($"自定义分享 Query: {param.Query}");
+        #endif
     }
 
     public void UpdateLevelAndScore(int level, int score)
@@ -6276,7 +6373,9 @@ public class InvitePanelDemo : MonoBehaviour
         };
 
         TT.CreateInvitePanel(param);
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log("邀请面板已创建");
+        #endif
     }
 }
 ```
@@ -6323,7 +6422,12 @@ public class InviteStateListener : MonoBehaviour
 
     private void OnInviteStateChanged(InviteStateInfo info)
     {
+        // ⚠️ 安全：inviterNickName 为用户昵称，生产环境禁止打印
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"邀请状态变化: {info.state}, 来自: {info.inviterNickName}");
+        #else
+        Debug.Log($"邀请状态变化: {info.state}");
+        #endif
 
         switch (info.state)
         {
@@ -6393,7 +6497,9 @@ public class RecordAndShare : MonoBehaviour
         {
             if (code == 0)
             {
+                #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 Debug.Log("SDK 初始化成功，准备录屏功能");
+                #endif
                 InitRecorder();
             }
         });

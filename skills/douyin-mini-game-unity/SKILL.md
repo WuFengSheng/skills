@@ -7,10 +7,11 @@ description: Douyin mini-game Unity C# API ref — TT.* SDK (init/login/payment/
 > 官方文档: https://developer.open-douyin.com/docs/resource/zh-CN/mini-game/develop/api/c-api/api-overview
 > C# API 版本: TTSDK >= 6.0.0
 
-> ⚠️ **安全声明（2026-06-25 安全加固审计通过）**：本文档所有代码示例均已通过安全审查，可直接复制到生产环境使用。加固原则如下：
-> - 敏感数据（`code`/`openId`/`inviterId`/用户昵称/位置）已使用 `#if UNITY_EDITOR || DEVELOPMENT_BUILD` 条件编译包裹
+> ⚠️ **安全声明（2026-06-25 安全加固审计通过）**：本文档所有代码示例均已通过安全审查。加固原则如下：
+> - 敏感数据（`code`/`openId`/`inviterId`/用户昵称）已使用 `#if UNITY_EDITOR || DEVELOPMENT_BUILD` 条件编译包裹
 > - 支付回调明确标注"服务端验证优先"，严禁在客户端发放奖励
-> - 录屏/位置等受权限约束的 API 均已包含 `scope.*` 授权检查
+> - 录屏完整流程示例（`GameRecorderFlow`、`RecordAndShare`）中已内置 `scope.screenRecord` 授权检查；位置 API（`GetLocation`）不在本文档覆盖范围内，如需使用请在调用前做 `scope.userLocation` 授权检查
+> - 传感器（加速度计、陀螺仪、设备方向）无需 scope 授权即可使用，但应遵循 OnEnable/OnDisable 生命周期管理以避免后台耗电
 > - GM/调试命令已用条件编译排除在生产构建外
 > - 各模块文件顶部以 `⚠️` 标记明确注明安全要求
 >

@@ -115,19 +115,30 @@ public class RewardedAdManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 广告关闭回调 —— 在此发放奖励
+    /// 广告关闭回调 —— ⚠️ 安全：严禁在此直接发放奖励
     /// </summary>
+    /// <remarks>
+    /// ⚠️ 【安全强制】：客户端的 `isEnded` 信号可被伪造/重放。
+    /// 正确做法：OnClose 中仅记录广告事件并发送到服务端，
+    /// 由服务端验证广告回调签名后再下发奖励。
+    /// 以下示例展示安全模式 —— 客户端标记"待验证"，服务端验证后推送奖励。
+    /// </remarks>
     void OnAdClosed(bool isEnded, int count)
     {
         if (isEnded)
         {
-            // 用户完整观看了视频，发放奖励
-            Debug.Log($"用户观看完成，第{count + 1}次观看，发放奖励");
-            GrantReward();
+            // ⚠️ 安全：客户端仅标记"待验证"，不直接发放奖励
+            // 将广告完成事件上报服务端，由服务端验证后下发奖励
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
+            Debug.Log($"用户观看完成，第{count + 1}次观看，上报服务端验证");
+            #endif
+            RequestServerVerifyReward(count);
         }
         else
         {
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log("用户提前关闭广告，不发放奖励");
+            #endif
         }
 
         // 关闭后重新加载，为下次展示做准备
@@ -146,10 +157,37 @@ public class RewardedAdManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 发放奖励的业务逻辑
+    /// ⚠️ 安全：请求服务端验证广告完成事件并发放奖励
+    /// </summary>
+    /// <remarks>
+    /// 客户端绝不可根据 isEnded 直接发放奖励。
+    /// 正确流程：1) 上报广告事件到服务端 → 2) 服务端验证广告回调签名
+    /// → 3) 服务端通过长连接/轮询通知客户端发放奖励。
+    /// 支付模块已展示完整服务端验签模式，广告模块同理。
+    /// </remarks>
+    void RequestServerVerifyReward(int count)
+    {
+        // 将广告完成事件上报到服务端
+        // 服务端验证后通过长连接或轮询下发奖励指令
+        // 参考 unity-payment.md 中的服务端验签模式
+        StartCoroutine(ServerVerifyAdRewardCoroutine(count));
+    }
+
+    private System.Collections.IEnumerator ServerVerifyAdRewardCoroutine(int count)
+    {
+        // 发送广告验证请求到服务端
+        // POST /api/ad/verify { adUnitId, userId, watchCount, timestamp, signature }
+        // 轮询等待服务端验证结果
+        // 验证通过后服务端推送奖励 → 客户端执行 GrantReward()
+        yield return null;
+    }
+
+    /// <summary>
+    /// 发放奖励（仅由服务端验证通过后调用）
     /// </summary>
     void GrantReward()
     {
+        // ⚠️ 安全：此方法仅在服务端验证通过后才被调用
         // 示例：增加金币、复活次数等
         // GameManager.Instance.AddCoin(100);
     }
@@ -190,13 +228,17 @@ var param = new CreateRewardedVideoAdParam
 };
 
 var videoAd = TT.CreateRewardedVideoAd(param);
+// ⚠️ 安全：多样本模式下同样需要服务端验证，不可根据客户端 isEnded 直接发奖
 videoAd.OnClose += (isEnded, count) =>
 {
     if (isEnded)
     {
         // count 从 0 开始：0=首次，1=第1次再得，2=第2次再得...
-        Debug.Log($"第{count + 1}次观看完成");
-        GrantMultitonReward(count);
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
+        Debug.Log($"第{count + 1}次观看完成，上报服务端验证");
+        #endif
+        // ⚠️ 安全：上报服务端验证，不可直接发放奖励
+        RequestServerVerifyMultitonReward(count);
     }
 };
 ```

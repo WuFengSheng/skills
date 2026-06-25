@@ -57,11 +57,14 @@ public class GameBootstrap : MonoBehaviour
         {
             if (code == 0)
             {
+                // ⚠️ 安全：环境信息含 AppId，生产环境禁止打印
+                #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 Debug.Log($"SDK 初始化成功");
                 Debug.Log($"宿主环境: {env.m_HostEnum}");
                 Debug.Log($"启动来源: {env.m_LaunchFromEnum}");
                 Debug.Log($"AppId: {env.GameAppId}");
                 Debug.Log($"版本类型: {env.GetVersionType()}");
+                #endif
             }
             else
             {
@@ -162,7 +165,8 @@ TT.InitSDK((code, env) =>
 {
     if (code != 0) return;
 
-    // 环境信息
+    // ⚠️ 安全：环境信息含 AppId/地域等敏感数据，生产环境禁止打印
+    #if UNITY_EDITOR || DEVELOPMENT_BUILD
     Debug.Log($"AppId: {env.GameAppId}");
     Debug.Log($"宿主: {env.m_HostEnum}");                     // 抖音/抖音极速版/头条等
     Debug.Log($"启动来源: {env.m_LaunchFromEnum}");            // 搜索/桌面/分享等
@@ -173,7 +177,6 @@ TT.InitSDK((code, env) =>
 
     // 地域信息
     // ⚠️ 安全：位置信息为敏感数据，生产环境禁止打印
-    #if UNITY_EDITOR || DEVELOPMENT_BUILD
     var location = env.GetLocation();
     Debug.Log($"位置: 经度={location.Longitude}, 纬度={location.Latitude}");
     #endif
@@ -326,19 +329,25 @@ TT.InitSDK((code, env) =>
     Debug.Log($"桌面快捷方式: {launchOption.IsSticky}");
 
     // Query 参数（如 Scheme 拉起时携带的参数）
+    // ⚠️ 安全：Query 可能包含邀请 token 等敏感数据，生产环境禁止打印
     if (launchOption.Query != null)
     {
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         foreach (var kv in launchOption.Query)
         {
             Debug.Log($"Query 参数: {kv.Key} = {kv.Value}");
         }
+        #endif
     }
 
     // 分享相关
     if (!string.IsNullOrEmpty(launchOption.ShareTicket))
     {
+        // ⚠️ 安全：ShareTicket 为授权票据，GroupId 关联用户社交上下文，生产环境禁止打印
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"分享票据: {launchOption.ShareTicket}");
         Debug.Log($"群 ID: {launchOption.GroupId}");
+        #endif
     }
 
     // 来源信息

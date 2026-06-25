@@ -35,7 +35,9 @@ public class RecorderDemo : MonoBehaviour
     void Start()
     {
         _recorder = TT.GetGameRecorderManager();
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log("录屏管理器已获取");
+        #endif
     }
 }
 ```
@@ -104,7 +106,7 @@ public void SetCustomKeyFrameInterval(int interval)
 
 ### 1.6 Start
 
-**说明**: 开始录屏。调用前需确保已启用录屏（`SetEnabled(true)`），且当前不在录制中。重复调用不会产生叠加录制。
+**说明**: 开始录屏。调用前需确保已通过 `TT.GetSetting()` 检查 `scope.screenRecord` 授权状态、已启用录屏（`SetEnabled(true)`），且当前不在录制中。重复调用不会产生叠加录制。完整的授权检查模式参见下方「1.12 录屏完整流程示例」及「四、录屏分享最佳实践」。
 
 **语法**:
 
@@ -283,7 +285,9 @@ public class GameRecorderFlow : MonoBehaviour
         {
             _recorder.Stop();
             _isRecording = false;
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
             Debug.Log($"录屏已停止，总时长: {_recorder.GetRecordDuration()}ms");
+            #endif
 
             // 检查是否有待分享的视频
             if (_recorder.GetVideoShareState() == 1)
@@ -297,7 +301,9 @@ public class GameRecorderFlow : MonoBehaviour
     {
         // 分享视频的入口由 IsShowVideoShareToast 控制
         // 此处可引导用户进行分享操作
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log("用户点击了分享视频按钮");
+        #endif
     }
 
     void OnDestroy()
@@ -458,8 +464,10 @@ public class CustomShareHandler : MonoBehaviour
         param.Query = $"scene=invite&level={_currentLevel}&score={_currentScore}";
         param.Extra = "custom_share_callback";
 
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"自定义分享标题: {param.Title}");
         Debug.Log($"自定义分享 Query: {param.Query}");
+        #endif
     }
 
     public void UpdateLevelAndScore(int level, int score)
@@ -542,7 +550,9 @@ public class InvitePanelDemo : MonoBehaviour
         };
 
         TT.CreateInvitePanel(param);
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log("邀请面板已创建");
+        #endif
     }
 }
 ```
@@ -589,7 +599,12 @@ public class InviteStateListener : MonoBehaviour
 
     private void OnInviteStateChanged(InviteStateInfo info)
     {
+        // ⚠️ 安全：inviterNickName 为用户昵称，生产环境禁止打印
+        #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"邀请状态变化: {info.state}, 来自: {info.inviterNickName}");
+        #else
+        Debug.Log($"邀请状态变化: {info.state}");
+        #endif
 
         switch (info.state)
         {
@@ -659,7 +674,9 @@ public class RecordAndShare : MonoBehaviour
         {
             if (code == 0)
             {
+                #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 Debug.Log("SDK 初始化成功，准备录屏功能");
+                #endif
                 InitRecorder();
             }
         });

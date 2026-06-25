@@ -167,12 +167,23 @@ public class SaveManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 清空所有存档（需用户确认）
+    /// 清空所有存档（⚠️ 不可逆，必须用户确认后执行）
     /// </summary>
     public void ClearAllSaveData()
     {
-        TT.ClearAllSaving();
-        Debug.Log("全部存档已清空");
+        // ⚠️ 安全：不可逆操作，调用前必须弹窗获得用户明确确认
+        ShowConfirmDialog("确定要清空所有存档吗？此操作不可撤销！", () =>
+        {
+            TT.ClearAllSaving();
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
+            Debug.Log("全部存档已清空");
+            #endif
+        });
+    }
+
+    private void ShowConfirmDialog(string message, System.Action onConfirm)
+    {
+        // 展示确认弹窗，用户确认后才执行 onConfirm
     }
 
     /// <summary>
@@ -430,12 +441,18 @@ public class GameSettingsManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 重置所有设置
+    /// 重置所有设置（⚠️ 不可逆，必须用户确认后执行）
     /// </summary>
     public void ResetAllSettings()
     {
-        TT.PlayerPrefs.DeleteAll();
-        Debug.Log("所有设置已重置");
+        // ⚠️ 安全：DeleteAll 不可逆，调用前必须弹窗获得用户明确确认
+        ShowConfirmDialog("确定要重置所有设置吗？此操作不可撤销！", () =>
+        {
+            TT.PlayerPrefs.DeleteAll();
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
+            Debug.Log("所有设置已重置");
+            #endif
+        });
     }
 
     private void ApplySettings(float musicVol, float sfxVol)
@@ -1081,18 +1098,24 @@ public class FileSystemSaveManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 清理所有数据
+    /// 清理所有数据（⚠️ 极度危险：递归删除全部文件，不可逆，必须用户确认后执行）
     /// </summary>
     public void ClearAllData()
     {
-        if (m_Fs == null) return;
-
-        if (m_Fs.AccessSync(m_DataDir))
+        // ⚠️ 安全：递归删除全部数据不可逆，调用前必须弹窗获得用户明确确认
+        ShowConfirmDialog("确定要清理所有数据吗？此操作将删除全部存档、配置和日志，不可撤销！", () =>
         {
-            m_Fs.RmdirSync(m_DataDir, true);
-        }
-        InitDirectory();
-        Debug.Log("全部数据已清理并重新初始化");
+            if (m_Fs == null) return;
+
+            if (m_Fs.AccessSync(m_DataDir))
+            {
+                m_Fs.RmdirSync(m_DataDir, true);
+            }
+            InitDirectory();
+            #if UNITY_EDITOR || DEVELOPMENT_BUILD
+            Debug.Log("全部数据已清理并重新初始化");
+            #endif
+        });
     }
 }
 
