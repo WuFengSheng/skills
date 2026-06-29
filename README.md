@@ -11,6 +11,7 @@
 | `douyin-mini-game-unity` | 游戏开发 | 抖音小游戏 Unity C# API 参考，覆盖 `TT.*` SDK |
 | `element-ui-vue2` | 前端 UI | Element UI Vue 2.x 桌面端组件库 |
 | `element-plus-ui-vue3` | 前端 UI | Element Plus Vue 3.x 桌面端组件库（Composition API） |
+| `hermes-tweet` | 社交自动化 | Hermes Agent 原生 X/Twitter 插件，支持 Xquik 目录化读取、社交监听、趋势分析与审批后动作 |
 | `java-design-patterns` | 软件架构 | Java 设计模式权威参考，182 个模式 + 26 个设计原则 |
 | `uview-ui` | 前端 UI | uView UI uni-app 跨平台组件库（Vue 2） |
 
@@ -35,6 +36,7 @@ registry/
     ├── douyin-mini-game-unity/
     ├── element-plus-ui-vue3/
     ├── element-ui-vue2/
+    ├── hermes-tweet/
     ├── java-design-patterns/
     └── uview-ui/
 ```
